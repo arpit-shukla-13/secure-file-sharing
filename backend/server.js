@@ -1,26 +1,12 @@
-// --- Imports ---
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
-const fileRoutes = require('./routes/fileRoutes'); // Routes ko import karna zaroori hai
+const mongoose = require('mongoose');
 require('dotenv').config();
+const fileRoutes = require('./routes/fileRoutes');
+const path = require('path');
 
-// --- Initializations ---
 const app = express();
 const PORT = process.env.PORT || 5001;
-
-// --- Middlewares ---
-// CORS ko theek se configure karna bahut zaroori hai
-app.use(cors({
-    origin: process.env.FRONTEND_URL, // .env se sirf frontend URL ko allow karein
-}));
-
-app.use(express.json()); // JSON data parse karne ke liye
-
-// --- API Routes ---
-// Yahan hum fileRoutes.js mein define kiye gaye saare routes ko link kar rahe hain
-app.use('/api/files', fileRoutes);
 
 // --- Database Connection ---
 const connectDB = async () => {
@@ -29,17 +15,36 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('MongoDB connect successfully!');
+    console.log('MongoDB connected successfully.');
   } catch (error) {
     console.error('MongoDB connection failed:', error.message);
     process.exit(1);
   }
 };
+connectDB();
+
+// --- Middlewares ---
+
+// This is the crucial fix. It correctly tells the server to allow requests
+// from the URL specified in your Render environment variables.
+const corsOptions = {
+  origin: process.env.FRONTEND_URL,
+  optionsSuccessStatus: 200 // For older browsers
+};
+app.use(cors(corsOptions));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// --- API Routes ---
+app.use('/api/files', fileRoutes);
 
 // --- Start Server ---
-connectDB().then(() => {
-    app.listen(PORT, () => {
-      console.log(`Backend server is running on port ${PORT} `);
-    });
+app.listen(PORT, () => {
+  console.log(`Backend server is running on port ${PORT}`);
 });
+
+
+
+    
 
