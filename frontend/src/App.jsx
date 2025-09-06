@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+// Yeh line code ko smart banati hai. Live website par yeh Render ka URL use karegi,
+// aur aapke computer par localhost use karegi.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
 // Helper function for XOR encryption/decryption
-// Yeh function buffer return karta hai
 async function xorProcess(chunk, key) {
     const keyBytes = new TextEncoder().encode(key);
     const chunkBytes = new Uint8Array(await chunk.arrayBuffer());
@@ -30,7 +33,6 @@ function App() {
         setFile(e.target.files[0]);
     };
 
-    // Aapka original upload logic, jo theek kaam kar raha tha
     const handleUpload = async () => {
         if (!file || !password) {
             setUploadMessage('Please select a file and enter a password.');
@@ -43,7 +45,8 @@ function App() {
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
         
         try {
-            const startResponse = await axios.post('http://localhost:5001/api/files/start-upload', {
+            // Using the smart API_URL instead of localhost
+            const startResponse = await axios.post(`${API_URL}/api/files/start-upload`, {
                 fileName: file.name,
                 totalChunks: totalChunks,
                 size: file.size,
@@ -62,7 +65,8 @@ function App() {
                 formData.append('chunkIndex', i);
                 formData.append('chunk', new Blob([encryptedBuffer]));
 
-                const promise = axios.post(`http://localhost:5001/api/files/upload-chunk/${fileId}`, formData)
+                // Using the smart API_URL
+                const promise = axios.post(`${API_URL}/api/files/upload-chunk/${fileId}`, formData)
                     .then(res => {
                         uploadedSize += chunk.size;
                         const progress = Math.round((uploadedSize / file.size) * 100);
@@ -74,7 +78,8 @@ function App() {
             await Promise.all(uploadPromises);
 
             setUploadMessage('All chunks uploaded. Merging file on server...');
-            const finishResponse = await axios.post('http://localhost:5001/api/files/finish-upload', {
+            // Using the smart API_URL
+            const finishResponse = await axios.post(`${API_URL}/api/files/finish-upload`, {
                 fileId,
                 password,
             });
@@ -90,7 +95,6 @@ function App() {
         }
     };
     
-    // Corrected download and decryption logic
     const handleDownload = async () => {
         if (!fileIdForDownload || !passwordForDownload) {
             setDownloadMessage('Please enter a File ID and password.');
@@ -99,7 +103,8 @@ function App() {
 
         try {
             setDownloadMessage('Requesting file...');
-            const response = await axios.get(`http://localhost:5001/api/files/download/${fileIdForDownload}`, {
+            // Using the smart API_URL
+            const response = await axios.get(`${API_URL}/api/files/download/${fileIdForDownload}`, {
                 params: { password: passwordForDownload },
                 responseType: 'blob',
             });
@@ -107,16 +112,14 @@ function App() {
             setDownloadMessage('File received. Decrypting...');
             const encryptedBlob = response.data;
             
-            // Decrypt the file
             const decryptedBuffer = await xorProcess(encryptedBlob, passwordForDownload);
             
-            // **THE FIX IS HERE:** We read the file type from the server's response
+            // The final fix for the download issue is here
             const fileType = response.headers['content-type'];
             const decryptedBlob = new Blob([decryptedBuffer], { type: fileType });
             
-            // Get original filename from server's response header
             const contentDisposition = response.headers['content-disposition'];
-            let fileName = 'decrypted-file'; // Default filename
+            let fileName = 'decrypted-file';
             if (contentDisposition) {
                 const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
                 if (fileNameMatch && fileNameMatch.length === 2) {
@@ -124,7 +127,6 @@ function App() {
                 }
             }
 
-            // Create a link and trigger the download with the correct filename
             const url = window.URL.createObjectURL(decryptedBlob);
             const a = document.createElement('a');
             a.style.display = 'none';
@@ -139,7 +141,7 @@ function App() {
         } catch (error) {
             console.error('Download error:', error);
             const errorMessage = error.response?.data?.message || 'Network Error. Check ID/password.';
-            setDownloadMessage(`Download failed: ${errorMessage}`);
+            setDownloadMessage(`Upload failed: ${errorMessage}`);
         }
     };
 
@@ -193,4 +195,3 @@ function App() {
 }
 
 export default App;
-
